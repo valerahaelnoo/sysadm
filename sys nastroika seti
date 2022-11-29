@@ -1,4 +1,19 @@
-Виртуальные машины и коммутация.
+Скролл: | less
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 1. Имена хостов в созданных ВМ должны быть установлены в соответствии со схемой:
 
 ISP:
@@ -481,7 +496,19 @@ WEB-R:
 server ntp.int.demo.wsr
 # systemctl restart chronyd.service
 
-5. Реализуйте файловый SMB-сервер на базе SRV
+5. Реализуйте файловый SMB-сервер на базе SRV                                                             mdadm --zero-superblock --force /dev/sd{b,c}
+                                                                                                          wipefs --all --force /dev/sd{b,c}
+                                                                                                          mdadm --create --verbose /dev/md0 -l 1 -n 2 /dev/sd{b,c}
+                                                                                                          lsblk
+                                                                                                          lsblk
+                                                                                                          lsblk
+                                                                                                          mkfs.ext4 /dev/md0
+                                                                                                          mount /dev/md0 /mnt
+                                                                                                          vi /etc/fstab
+                                                                                                                /dev/md0        /mnt    ext4    defaults    1 2
+                                                                                                          df -h
+                                                                                                          cat /proc/mdstat
+                                                                                                          https://www.dmosk.ru/miniinstruktions.php?mini=mdadm
 SRV: (RAID1)
 # dnf -y install mdadm
 # lsblk
@@ -500,3 +527,61 @@ done
 # echo "/dev/md1 /mnt/storage xfs defaults 0 0" | sudo tee -a /etc/fstab
 # mount -a
 # df -hT
+-----------------------------------------------------------
+firewall-cmd --permanent --add-service=samba
+firewall-cmd --reload
+SEELinux
+nano/etc/seelinux/config 
+    SELINUX=disabled
+-----------------------------------------------------------
+dnf install samba
+systemctl enable smb --now
+systemctl status smb
+vi /etc/samba/smb.conf
+    map to guest = Bad Password
+[Общая папка]
+    comment = Public Folder
+    path = /data/public
+    public = yes
+    writable = yes
+    read only = no
+    guest ok = yes
+    create mask = 0777
+    directory mask = 0777
+    force create mode = 0777
+    force directory mode = 0777
+На папки права
+https://www.dmosk.ru/instruktions.php?object=samba-centos8
+Монтирование
+Dnf install cifs-utils
+mount.cifs <папка на сервере> <во что монтируем>
+mount.cifs //192.168.1.10/share /mnt -o guest
+Автомонтирование
+vi /root/.smbclient
+     username=dmosk
+     password=dPassw0rd
+     domain=dmosk.local
+vi /etc/fstab
+//192.168.1.10/share    /mnt    cifs    guest    0 0
+mount -a
+https://www.dmosk.ru/miniinstruktions.php?mini=linux-cifs
+---------------------------------------------------------
+Центр серитфикации
+https://gb.ru/posts/postroenie-nebolshogo-centra-sertifikacii-na-osnove-openssl
+dnf install openssl
+mkdir /var/ca
+cd /var/ca
+openssl req -newkey rsa:4096 -keyform PEM -keyout ca.key -x509 -days 600 -outform PEM -out ca.cer
+ls
+ openssl x509 -text -noout -in ca.cer | loss
+ openssl genrsa -out server.key 4096
+vi /etc/ssh/sshd_config
+    PermitRootLogin yes
+$ scp опции пользователь1@хост1:файл пользователь2@хост2:файл
+scp root@100.0.0.0 /var/ca /home/user                                       https://losst.pro/kopirovanie-fajlov-scp
+Установка корневого сертификата альт: 
+scp root@100.0.0.0 /var/ca /etc/pki/tls/certs/ca-bundle.crt                 https://www.altlinux.org/Установка_корневого_сертификата
+cp /home/user/ca.crt /etc/pki/ca-trust/source/anchors/ && update-ca-trust
+Установка корневого сертификата Windows:
+через WinSCP
+
