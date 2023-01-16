@@ -134,6 +134,7 @@ DHCP
 средства DHCP создать область , диапазон 172.20.2.1 - 172.2-.3.254 /23 исключение 172.20.2.1, 172.20.3.100, маршрутизатор 172.20.2.1
 
 *************ALT SERVER**************
+
 в браузере localhost:8080
 DHCP сервер, диапазон 172.20.3.101 - 172.20.3.254 срок действия 8 часов, dns 172.20.0.100, Домен, шлюз 172.20.2.1
 ***NTP СЕРВЕР
@@ -171,6 +172,7 @@ save
 указать моргушко путь к профилю в Active Directory
 
 **********СОЗДАНИЕ RAID5********
+
 НА WINFS 
 powershell
 diskpart
@@ -191,6 +193,7 @@ assign letter =D
 format fs-ntfs
 
 ****windc**
+
 диспетчер ресурсов файлового сервера > пкм > подключиться к другому компьютеры > fs > управление квотами> Шаблоны квот > создать шаблон квот>
 20mb порог 20 mb создать
 **winfs 
@@ -222,6 +225,169 @@ shown root: /samvb
 mount -a
 df -h
 reboot везде
+
+центр сертификации, скинуть 2 файла с винды.
+
+****DOCKER****
+
+**srv alt
+systemctl enable --now docker
+docker --version
+cd /home/admin/docker
+ll
+nano dockerfile
+nano app.py
+docker build -t app
+docker images
+docker run --name app -p 80:5000 -d app
+docker ps
+*** с клиента http://www.domen.com
+***BITLOCKER*****
+win cli 
+Управление компьютером > управление дисками > диск 0 пкм сжать (размер сжимаемого пространства 5120) > создать новый том 
+зайти с Director
+powershell
+enable-bitlocker -MountPoint U(диск) -PasswordProtector
+
+****************СЕТЕВАЯ СВЯЗНОСТЬ*****************
+FW И APP-V
+FW
+sudo su
+cd /root/
+mkdir /etc/wireguard/keys
+cd /etc/wireguard/keys
+wg genkey : tee srv-sec.key :wg pubkey > srv-pub.key
+wg genkey : tee cli-sec.key :wg pubkey > cli-pub.key
+ls -l
+cat srv-sec.key cli-pub.key >> /etc/wireguard/wg0.conf
+nano /etc/wireguard/wg0.conf
+добавить 
+[itnterface]
+Address = 10.20.30.1/30
+ListenPort = 12345
+Privatekey = первый шифр
+
+[Peer]
+PublicKey = второй шифр
+AllowedIPs = 10.20.30.0/30
+systemctl enable --now wg-quick@wg0
+scp srv-pub.key cli-sec.key root@200.100.100.200:/tmp
+ip a
+reboot
+
+***APP-V
+apt-get install -y wireguard-tools wireguard-tools-wg-quick
+cd /tmp
+ls
+mkdir /etc/wireguard
+cat cli-sec.key
+cat cli-sec.key srv-pub.key >> /etc/wireguard.wg0.conf
+nano /etc/wireguard.wg0.conf
+Добавить
+[itnterface]
+Address = 10.20.30.2/30
+Privatekey = первый шифр=
+
+[Peer]
+PublicKey = второй шифр=
+Endpoint = 200.100.100.100:12345
+AllowedIPs = 10.20.30.0/30 172.20.0.0/24 172.20.2.0/23
+PersistentKeepalive = 10
+systemctl enable --now wg-qiuck
+ip a
+ip r
+show enp0s3
+
+**************ХОСТИНГ**********
+APP-L APP-R
+systemctl enable --now nginx
+cd /tmp
+ls
+cd
+mkdir -p /var/www/html
+mv index1.html index.html
+cp index.html /var/www/html/
+nano /etc/nginx/sites-aviabled/default.conf
+
+listen 80 default_server
+
+ln -s /etc/nginx/sites-avaibale.d/default.conf /etc/nginx/sites-enabled.d/default.conf
+nginx -t
+systemctl restart nginx
+systemctl status nginx
+
+***APP-R***
+
+systemctl enable --now nginx
+mkdir -p /var/www/html
+mv index2.html index.html
+cp index.html /var/www/html/
+nano /etc/nginx/sites-aviable/default
+listen 80 default_server
+ln -s /etc/nginx/sites-aviable/default.conf /etc/nginx/sites-enabled/default.conf
+nginx -t
+restart status
+
+**********APP-V *************
+
+mkdir cert
+cd cert/
+pwd 
+openss; genrsa -out app.key 4096
+|]
+openssl req-new -key app.key -out app.req -sha256
+organization namme Oaklet.org
+common name app.first
+scp app.req root@172.20.3.100:/var/ca
+|]
+
+***SRV(ALT)***
+su-
+cd /var/ca
+ls
+openssl x509 -req -in app.req -CA ca.cer -CAkey ca.key -set_serial_100 -extintions app -days 1460 -outform PEM -out app.cer -sha256
+ll
+
+***APP-V***
+scp root@172.20.3.100:/var/ca/app.cer ./
+ll
+mkdir -p /etc/pki/nginx/private
+cp app.cer /etc/pki/nginx
+cp app.key /etc/pki/nginx/private/
+systemctl enable --now nginx
+nano /etc/nginx/sites-aviable.d/proxy.conf
+upstream backend (
+        server 10.116.0.20 fail_timeout=20;
+        server 10.116.0.30 fail_timeout=30;
+)
+
+server (
+        listen 443 ssl default_server;
+        server_name app.first:
+        
+        ssl_sertificate /etc/pki/nginx/app.cer;
+        ssl_certificate_key /etc/pki/nginx/private/app.key;
+        
+        location / (
+                proxy_pass  http://backend;
+        )
+)
+
+server (
+        listen_80 default_server;
+        server_name app.first;
+        return 302 https://app.first;
+)
+****
+ln -s /etc/nginx/nginx/sites-ava.d/proxy.conf /etc/nginx/sites-enabled.d/proxy.conf
+nginx -t
+systemctl restart nginx
+firewall-cmd --list-all
+firewall-cmd --permanent -add-service (httt; https)
+firewall-cmd --reload
+
+http://app.first
+
 ********************************************************************************
 1. Имена хостов в созданных ВМ должны быть установлены в соответствии со схемой:
 
