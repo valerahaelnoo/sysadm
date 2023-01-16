@@ -110,7 +110,8 @@ reboot
 ip a 
 ping ya.ru
 
-*******************************************************************************
+*******************************************************************************ДАЛЕЕ
+
 на WINDC в Все серверы добавить сервер FS
 на FS добавить роль Файловый сервер и Диспетчер ресурсов файлового сервера
 пользователи и компы Active Directory создать подразделение ADM, группу, пользователь Director, Secretary, добавить их в группу ADM
@@ -119,7 +120,108 @@ ping ya.ru
 подразделение Development, группу Frontend и Backend, пользователя Morgushko и Radji.... 
 короче это понятно
 Director добавить в группу Администраторы и Администраторы Домена
+**************************
+Управление групповыми политиками > Oaklet.org > Объекты групповой политики пкм создать onedrive, removable media, camera, desktop
+пкм (onedrive) > изменить > конфигурация компьютера > политики > админ шаблоны > компоненты Win > onedrive > запретить для хранения файлов
+для ремувабле медиа  > политики > админ шаблоны > система > доступ к съмным запоминающим устройствам > съемнеые запоминающие устройства всех классов запретить
+в конф. пользователя система доступ к запоминающим устройствам запретить
+camera > политики > админ шаблоны > компоненты Win > камера > отклдючить
+desktop > политики > админ шаблоны > панель управления > персонализация > запретить изменение изображения экрана блокировки и входа в систему, запрет изменения входа в главное меню, запрет включения камеры с экрана блокировки, слайд шоу
+для пользователя там же запрет цветовой схемы, темы, и тд.
+пкм по домену, создать существующий объект групповой политики и выбрать созданные
+powersell gpupdate /force
+DHCP
+средства DHCP создать область , диапазон 172.20.2.1 - 172.2-.3.254 /23 исключение 172.20.2.1, 172.20.3.100, маршрутизатор 172.20.2.1
 
+*************ALT SERVER**************
+в браузере localhost:8080
+DHCP сервер, диапазон 172.20.3.101 - 172.20.3.254 срок действия 8 часов, dns 172.20.0.100, Домен, шлюз 172.20.2.1
+***NTP СЕРВЕР
+su-
+apt-get install -y chrony
+nano /etc/chrony.conf 
+allow 172.20.0.0/24
+allow 172.20.2.0/23
+systemctl enable --now chronyd
+systemctl status --now chronyd
+chronyc sources
+на winser (обоих) powershell
+start-service w32time
+w32tm /config /manualpeerlist::172.20.3.100 /syncfromflags:manual /reliable:yes /update
+restart-service w32time
+на wincli 
+powershell
+New-NetFirewallRule -DisplayName 'NTP' -Direction Inbound -LocalPort 123 -Protocol UDP Action Allow
+start-service w32time
+w32tm /config /manualpeerlist и далее
+restart-service w32time
+set service -Name w32time -startupType Automatic
+****на ALT CLI 
+apt-get install chronyd
+nano /etc/chrony.conf
+заменить pool 172.20.3.100 iburst
+allow 172.20.2.0/23
+systemctl restart
+***VYOS
+configure
+set system ntp server 172.20.3.100
+commit
+save
+проверка chronyd clients
+указать моргушко путь к профилю в Active Directory
+
+**********СОЗДАНИЕ RAID5********
+НА WINFS 
+powershell
+diskpart
+select disk 1
+attrib disk clear readonly
+convert dynamic
+select disk 2
+attrib disk clear readonly
+convert dynamik
+disk 3 4 5 тоже самое 
+list disk
+create volume raid disk=1,2,3,4,5
+list volume
+select volume 0
+assign letter =b
+select volume 3
+assign letter =D
+format fs-ntfs
+
+****windc**
+диспетчер ресурсов файлового сервера > пкм > подключиться к другому компьютеры > fs > управление квотами> Шаблоны квот > создать шаблон квот>
+20mb порог 20 mb создать
+**winfs 
+list volume
+windc
+файловые службы
+общие ресурсы> пкм новый ресурс > далее фс д > путь (создать папку opt/share на д)> далее далее настройки разрешений добавить smb ок применить создать настроить квоту и 20мб туда
+*******автомонтирование на клиентах******
+alt и win
+powershell 
+diskpart
+list volume
+select volume 0
+assign later = b
+подключить сетевой диск 
+\\fs.domem\share
+smb
+пкм по шар > подключить диск 
+***ALT
+apt-get install -y cifs-utils 
+mkdir mnt/adminshare
+chmod
+echo //FS.oaklet.org/share /mnt/adminsgare cifs users, credentials=/etc/samba/sambacreeds,file_mode=0777,dir_mode=0777 0 0>> /etc/fstab
+nano /etc/samba/sambacreds
+username=smb
+password=P@ssw0rd
+chmod sambacresd
+shown root: /samvb
+mount -a
+df -h
+reboot везде
 ********************************************************************************
 1. Имена хостов в созданных ВМ должны быть установлены в соответствии со схемой:
 
